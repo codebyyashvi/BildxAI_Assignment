@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 class GenerationStatus(str, Enum):
     PENDING = "pending"
@@ -15,7 +15,7 @@ class ProductContext(BaseModel):
     product_name: str = Field(..., min_length=1, max_length=100, description="Product Name")
     product_description: str = Field(..., min_length=5, max_length=1000, description="Product Description")
     target_audience: str = Field(..., min_length=2, max_length=200, description="Target Audience")
-    key_benefits: List[str] = Field(..., min_items=1, max_items=10, description="List of key product benefits")
+    key_benefits: List[str] = Field(..., min_length=1, max_length=10, description="List of key product benefits")
     tone: str = Field(..., min_length=2, max_length=100, description="Desired advertising tone")
 
     @field_validator("key_benefits")

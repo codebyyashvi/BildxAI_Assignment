@@ -1,0 +1,87 @@
+/* ── Spinner animation ── */
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0,0,0,.25);
+  border-top-color: #10150d;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+
+/* ── Empty-state stacked cards ── */
+.empty-art {
+  width: 155px;
+  height: 180px;
+  position: relative;
+  border: 1px solid #292e29;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #191d19, #111411);
+  transform: rotate(3deg);
+  margin-bottom: 37px;
+  display: grid;
+  place-items: center;
+}
+.empty-art::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 1px dashed #303630;
+  border-radius: 7px;
+}
+.empty-art span {
+  color: var(--color-lime);
+  font-size: 27px;
+  filter: drop-shadow(0 0 18px rgba(194,244,104,.6));
+}
+.empty-art i {
+  position: absolute;
+  width: 130px;
+  height: 165px;
+  border: 1px solid #242924;
+  border-radius: 12px;
+  z-index: -1;
+  transform: translate(-14px, 8px) rotate(-8deg);
+}
+.empty-art i:last-child {
+  transform: translate(16px, 10px) rotate(8deg);
+}
+
+/* ── Scan animation card ── */
+.scan-card {
+  position: relative;
+  width: min(330px, 85%);
+  aspect-ratio: 4/3;
+  border-radius: 14px;
+  border: 1px solid var(--color-line);
+  background: linear-gradient(145deg, #191d19, #0e110e);
+  overflow: hidden;
+  margin-bottom: 34px;
+  display: grid;
+  place-items: end center;
+}
+.scan-card::before {
+  content: '✦';
+  color: #4b5347;
+  font-size: 52px;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.scan-card span {
+  z-index: 1;
+  font: 9px var(--font-mono);
+  color: #889083;
+  margin-bottom: 18px;
+  text-transform: uppercase;
+}
+.scan-line {
+  position: absolute;
+  top: 0;
+  left: 8%;
+  right: 8%;
+  height: 1px;
+  background: var(--color-lime);
+  box-shadow: 0 0 15px var(--color-lime);
+  animation: scan 2.2s ease-in-out infinite;
+}

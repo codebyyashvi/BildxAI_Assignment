@@ -1,0 +1,32 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      AI_PROVIDER: ${AI_PROVIDER:-fake}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      MAX_CONCURRENT_GENERATIONS: ${MAX_CONCURRENT_GENERATIONS:-3}
+      MAX_QUEUE_SIZE: ${MAX_QUEUE_SIZE:-20}
+      PROVIDER_TIMEOUT_SECONDS: ${PROVIDER_TIMEOUT_SECONDS:-15}
+      DOWNLOAD_TIMEOUT_SECONDS: ${DOWNLOAD_TIMEOUT_SECONDS:-8}
+      STORAGE_DIR: /app/storage/output_ads
+    volumes:
+      - generated_ads:/app/storage/output_ads
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "${APP_PORT:-3000}:80"
+    restart: unless-stopped
+
+volumes:
+  generated_ads:

@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/* ── Design tokens ── */
+@theme {
+  --color-bg: #0a0c0b;
+  --color-panel: #151815;
+  --color-soft: #1b1f1b;
+  --color-line: #292e29;
+  --color-cream: #f0efe5;
+  --color-txt: #a3a79e;
+  --color-muted: #7c8278;
+  --color-lime: #c2f468;
+  --color-err: #f58f82;
+  --color-warn: #f0d178;
+
+  --font-sans: Inter, "Segoe UI", Arial, sans-serif;
+  --font-display: Georgia, "Times New Roman", serif;
+  --font-mono: "SFMono-Regular", Consolas, monospace;
+}
+
+/* ── Base layer ── */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    background: var(--color-bg);
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% -10%, #182018 0, var(--color-bg) 35%);
+    font: 16px/1.5 var(--font-sans);
+    color: var(--color-txt);
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  button,
+  input,
+  textarea {
+    font-family: inherit;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--color-lime);
+    outline-offset: 2px;
+  }
+
+  input,
+  textarea {
+    width: 100%;
+    border: 1px solid var(--color-line);
+    background: #111411;
+    color: var(--color-cream);
+    border-radius: 10px;
+    padding: 12px 13px;
+    font: 13px/1.45 var(--font-sans);
+    outline: none;
+    transition: .2s;
+  }
+
+  input:focus,
+  textarea:focus {
+    border-color: rgba(194, 244, 104, .65);
+    box-shadow: 0 0 0 3px rgba(194, 244, 104, .07);
+  }
+
+  textarea {
+    resize: vertical;
+  }
+}
+
+/* ── Animations ── */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes scan {
+  50% {
+    top: 92%;
+  }
+}

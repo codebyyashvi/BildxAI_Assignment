@@ -1,5 +1,5 @@
-import os
 from pathlib import Path
+from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
@@ -7,9 +7,16 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = Field(default="development", description="Environment: development, production, test")
     HOST: str = Field(default="0.0.0.0", description="Host to bind backend")
     PORT: int = Field(default=8000, description="Port to bind backend")
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:3000,http://localhost:5173",
+        description="Comma-separated browser origins allowed to call the API",
+    )
     
     # Provider configuration
-    AI_PROVIDER: str = Field(default="fake", description="AI Provider: fake, gemini, or openai")
+    AI_PROVIDER: Literal["fake", "gemini", "openai"] = Field(
+        default="fake",
+        description="AI Provider: fake, gemini, or openai",
+    )
     GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key")
     GEMINI_MODEL: str = Field(default="gemini-1.5-flash", description="Gemini model to use")
     OPENAI_API_KEY: str = Field(default="", description="OpenAI API key")

@@ -1,5 +1,4 @@
 import json
-import asyncio
 import httpx
 from app.services.providers.base import BaseAIProvider
 from app.schemas.generation import ProductContext, CreativeOutput
@@ -26,7 +25,7 @@ class GeminiAIProvider(BaseAIProvider):
     async def generate_ad_copy(self, context: ProductContext) -> CreativeOutput:
         prompt_text = build_copy_prompt(context)
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
         payload = {
             "contents": [
                 {
@@ -45,7 +44,11 @@ class GeminiAIProvider(BaseAIProvider):
 
         try:
             async with httpx.AsyncClient(timeout=settings.PROVIDER_TIMEOUT_SECONDS) as client:
-                response = await client.post(url, json=payload)
+                response = await client.post(
+                    url,
+                    headers={"x-goog-api-key": self.api_key},
+                    json=payload,
+                )
 
                 if response.status_code == 429:
                     raise TemporaryError("Gemini API rate limit exceeded (429).")

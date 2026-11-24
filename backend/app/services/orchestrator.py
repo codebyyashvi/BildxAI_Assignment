@@ -39,6 +39,7 @@ class GenerationOrchestrator:
         self.pending_count = 0
         self.active_provider_calls = 0
         self._lock = asyncio.Lock()
+        self._tasks: set[asyncio.Task] = set()
 
     def get_generation(self, generation_id: str) -> GenerationRecord:
         record = self.records.get(generation_id)
@@ -97,8 +98,18 @@ class GenerationOrchestrator:
 
             self.pending_count += 1
 
-        # Launch background task for failure-isolated execution
-        asyncio.create_task(self._process_generation(generation_id, allow_local_for_testing))
+        # Keep a strong reference until completion so background work cannot be
+        # garbage-collected while a request is still in flight.
+        task = asyncio.create_task(
+            self._process_generation(generation_id, allow_local_for_testing)
+        )
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+        # Give an available worker a chance to claim the job. This keeps
+        # pending_count representative of jobs actually waiting for a slot and
+        # makes queue admission deterministic under request bursts.
+        await asyncio.sleep(0)
         return record
 
     async def _process_generation(self, generation_id: str, allow_local_for_testing: bool):
@@ -164,11 +175,14 @@ class GenerationOrchestrator:
                     # Step 4: Compose Final Advertisement Image
                     output_filename = f"{generation_id}.png"
                     output_file_path = settings.STORAGE_DIR / output_filename
-                    compose_advertisement(
+                    # Pillow composition is CPU-bound; keep it off the event
+                    # loop so polling and new API requests remain responsive.
+                    await asyncio.to_thread(
+                        compose_advertisement,
                         product_image_bytes=image_bytes,
                         context=record.context,
                         creative=creative,
-                        output_path=output_file_path
+                        output_path=output_file_path,
                     )
                     record.image_relative_path = output_filename
 

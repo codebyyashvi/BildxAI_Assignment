@@ -1,5 +1,6 @@
 import io
 import httpx
+from urllib.parse import urljoin
 from PIL import Image
 from app.core.config import settings
 from app.core.security import validate_image_url
@@ -19,9 +20,25 @@ async def download_and_validate_image(url: str, allow_local_for_testing: bool = 
     }
 
     try:
-        async with httpx.AsyncClient(timeout=settings.DOWNLOAD_TIMEOUT_SECONDS, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=settings.DOWNLOAD_TIMEOUT_SECONDS, follow_redirects=False) as client:
             try:
-                response = await client.get(url, headers=headers)
+                current_url = url
+                response = None
+                for _ in range(4):
+                    response = await client.get(current_url, headers=headers)
+                    if response.status_code not in (301, 302, 303, 307, 308):
+                        break
+                    location = response.headers.get("location")
+                    if not location:
+                        raise PermanentError("Image server returned a redirect without a destination.")
+                    current_url = urljoin(current_url, location)
+                    # Validate every redirect target, not just the initial URL.
+                    validate_image_url(
+                        current_url,
+                        allow_local_for_testing=allow_local_for_testing,
+                    )
+                else:
+                    raise PermanentError("Image URL exceeded the maximum of 4 redirects.")
             except httpx.TimeoutException as e:
                 raise TemporaryError(f"Image download timed out after {settings.DOWNLOAD_TIMEOUT_SECONDS}s: {str(e)}")
             except (httpx.ConnectError, httpx.NetworkError) as e:

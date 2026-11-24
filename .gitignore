@@ -1,2 +1,15 @@
 backend/.venv/
 __pycache__
+.env
+.env.*
+!.env.example
+*.py[cod]
+.pytest_cache/
+backend/storage/
+storage/
+frontend/node_modules/
+frontend/dist/
+*.log
+.DS_Store
+.idea/
+.vscode/
