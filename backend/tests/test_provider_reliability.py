@@ -1,9 +1,5 @@
-"""
-Provider reliability tests: temporary retry, permanent no-retry, timeout classification.
-Uses pytest-asyncio with WindowsSelectorEventLoopPolicy (set in conftest.py).
-"""
 import asyncio
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -27,7 +23,7 @@ def context(name: str) -> ProductContext:
 
 
 async def wait_for_terminal(orch: GenerationOrchestrator, generation_id: str):
-    for _ in range(200):
+    for _ in range(100):
         record = orch.get_generation(generation_id)
         if record.status in (GenerationStatus.COMPLETED, GenerationStatus.FAILED):
             return record
@@ -69,21 +65,9 @@ async def test_permanent_provider_error_is_not_retried(sample_image_bytes):
 @pytest.mark.asyncio
 async def test_openai_provider_timeout_is_temporary():
     provider = OpenAIAIProvider(api_key="test-key", model="test-model")
-
-    # Use MockTransport to simulate a timeout instead of patching AsyncClient.post
-    def handler(request: httpx.Request) -> httpx.Response:
-        raise httpx.ReadTimeout("timed out")
-
-    transport = httpx.MockTransport(handler)
-    original_cls = httpx.AsyncClient
-    class _PatchedClient(original_cls):
-        def __init__(self, **kwargs):
-            kwargs["transport"] = transport
-            super().__init__(**kwargs)
-    httpx.AsyncClient = _PatchedClient
-    try:
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.side_effect = httpx.ReadTimeout("timed out")
         with pytest.raises(TemporaryError) as exc_info:
             await provider.generate_ad_copy(context("Timeout Item"))
-        assert str(settings.PROVIDER_TIMEOUT_SECONDS) in exc_info.value.message
-    finally:
-        httpx.AsyncClient = original_cls
+
+    assert str(settings.PROVIDER_TIMEOUT_SECONDS) in exc_info.value.message

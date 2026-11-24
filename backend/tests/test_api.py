@@ -1,16 +1,12 @@
-"""
-API route tests using Starlette's synchronous TestClient.
-This avoids Windows event-loop hangs entirely.
-"""
-import time
+import asyncio
+import pytest
 from unittest.mock import patch, AsyncMock
-from app.services.orchestrator import orchestrator, GenerationOrchestrator
+from app.services.orchestrator import orchestrator
 from app.schemas.generation import GenerationStatus
 from app.core.config import settings
 
-
-def test_full_ad_generation_flow(sync_client, sample_image_bytes):
-    """POST /generations -> poll until COMPLETED -> download image."""
+@pytest.mark.asyncio
+async def test_full_ad_generation_flow(async_client, sample_image_bytes):
     with patch("app.services.orchestrator.download_and_validate_image", new_callable=AsyncMock) as mock_dl:
         mock_dl.return_value = sample_image_bytes
         payload = {
@@ -20,23 +16,24 @@ def test_full_ad_generation_flow(sync_client, sample_image_bytes):
             "target_audience": "Commuters and hikers",
             "key_benefits": ["Up to 12 hours cold", "Carry loop", "Locking lid"],
             "tone": "Adventurous and practical",
-            "idempotency_key": "test-flow-sync-key-1"
+            "idempotency_key": "test-flow-key-1"
         }
 
-        # 1. Enqueue
-        response = sync_client.post("/api/generations", json=payload)
+        # 1. Enqueue generation
+        response = await async_client.post("/api/generations", json=payload)
         assert response.status_code == 202
         data = response.json()
         assert "id" in data
         gen_id = data["id"]
         assert data["status"] in ("pending", "processing")
 
-        # 2. Poll until COMPLETED (background task runs in TestClient's event loop)
+        # 2. Poll until completed
+        max_attempts = 40
         completed = False
-        for _ in range(60):
-            poll = sync_client.get(f"/api/generations/{gen_id}")
-            assert poll.status_code == 200
-            poll_data = poll.json()
+        for _ in range(max_attempts):
+            poll_resp = await async_client.get(f"/api/generations/{gen_id}")
+            assert poll_resp.status_code == 200
+            poll_data = poll_resp.json()
             if poll_data["status"] == GenerationStatus.COMPLETED.value:
                 completed = True
                 assert poll_data["creative_output"] is not None
@@ -46,48 +43,46 @@ def test_full_ad_generation_flow(sync_client, sample_image_bytes):
                 assert poll_data["image_url"] is not None
                 break
             elif poll_data["status"] == GenerationStatus.FAILED.value:
-                import pytest
                 pytest.fail(f"Generation failed prematurely: {poll_data.get('error_message')}")
-            time.sleep(0.05)
+            await asyncio.sleep(0.05)
 
         assert completed, "Generation did not reach COMPLETED state within allotted time"
 
         # 3. Download generated image
-        img_resp = sync_client.get(f"/api/generations/{gen_id}/image")
+        img_resp = await async_client.get(f"/api/generations/{gen_id}/image")
         assert img_resp.status_code == 200
         assert img_resp.headers["content-type"] == "image/png"
         assert len(img_resp.content) > 0
 
-
-def test_api_validation_error(sync_client):
-    """Missing required fields must return 422."""
+@pytest.mark.asyncio
+async def test_api_validation_error(async_client):
+    # Missing required fields
     bad_payload = {
         "image_url": "https://example.com/item.png",
         "product_name": ""
     }
-    response = sync_client.post("/api/generations", json=bad_payload)
-    assert response.status_code == 422
+    response = await async_client.post("/api/generations", json=bad_payload)
+    assert response.status_code == 422 # FastAPI validation failure
 
-
-def test_api_samples_endpoint(sync_client):
-    response = sync_client.get("/api/samples")
+@pytest.mark.asyncio
+async def test_api_samples_endpoint(async_client):
+    response = await async_client.get("/api/samples")
     assert response.status_code == 200
     samples = response.json()
     assert isinstance(samples, list)
     assert len(samples) >= 1
     assert "product_name" in samples[0]
 
-
-def test_api_health_endpoint(sync_client):
-    response = sync_client.get("/api/health")
+@pytest.mark.asyncio
+async def test_api_health_endpoint(async_client):
+    response = await async_client.get("/api/health")
     assert response.status_code == 200
     health = response.json()
     assert health["status"] == "healthy"
     assert "concurrency_limit" in health
 
-
-def test_api_idempotency_header_prevents_duplicate_work(sync_client, sample_image_bytes):
-    """Two requests with the same Idempotency-Key must return the same generation ID."""
+@pytest.mark.asyncio
+async def test_api_idempotency_header_prevents_duplicate_work(async_client, sample_image_bytes):
     payload = {
         "image_url": "https://example.com/item.png",
         "product_name": "Idempotent Product",
@@ -101,37 +96,35 @@ def test_api_idempotency_header_prevents_duplicate_work(sync_client, sample_imag
         new_callable=AsyncMock,
         return_value=sample_image_bytes,
     ):
-        first = sync_client.post(
+        first = await async_client.post(
             "/api/generations",
             json=payload,
-            headers={"Idempotency-Key": "api-idempotency-sync-test"},
+            headers={"Idempotency-Key": "api-idempotency-test"},
         )
-        second = sync_client.post(
+        second = await async_client.post(
             "/api/generations",
             json=payload,
-            headers={"Idempotency-Key": "api-idempotency-sync-test"},
+            headers={"Idempotency-Key": "api-idempotency-test"},
         )
 
     assert first.status_code == 202
     assert second.status_code == 202
     assert first.json()["id"] == second.json()["id"]
+    assert len(orchestrator.records) == 1
 
-
-def test_api_returns_429_when_queue_is_full(sync_client):
-    """When pending_count >= MAX_QUEUE_SIZE, the API must return 429."""
-    saved = orchestrator.pending_count
+@pytest.mark.asyncio
+async def test_api_returns_429_when_queue_is_full(async_client):
     orchestrator.pending_count = settings.MAX_QUEUE_SIZE
-    try:
-        payload = {
-            "image_url": "https://example.com/item.png",
-            "product_name": "Capacity Product",
-            "product_description": "A product used to verify queue admission.",
-            "target_audience": "API testers",
-            "key_benefits": ["Predictable capacity"],
-            "tone": "Direct",
-        }
-        response = sync_client.post("/api/generations", json=payload)
-        assert response.status_code == 429
-        assert "capacity reached" in response.json()["detail"].lower()
-    finally:
-        orchestrator.pending_count = saved
+    payload = {
+        "image_url": "https://example.com/item.png",
+        "product_name": "Capacity Product",
+        "product_description": "A product used to verify queue admission.",
+        "target_audience": "API testers",
+        "key_benefits": ["Predictable capacity"],
+        "tone": "Direct",
+    }
+
+    response = await async_client.post("/api/generations", json=payload)
+
+    assert response.status_code == 429
+    assert "capacity reached" in response.json()["detail"].lower()
